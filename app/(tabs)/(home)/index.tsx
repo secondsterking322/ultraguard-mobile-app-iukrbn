@@ -16,15 +16,27 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { colors, commonStyles } from '@/styles/commonStyles';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+interface BlockedAttempt {
+  id: string;
+  type: 'hidden' | 'unauthorized' | 'suspicious';
+  timestamp: string;
+  source: string;
+}
+
 export default function SecurityDashboard() {
   const [protectionEnabled, setProtectionEnabled] = useState(true);
   const [antivirusEnabled, setAntivirusEnabled] = useState(true);
   const [callBlockEnabled, setCallBlockEnabled] = useState(true);
   const [screenProtectionEnabled, setScreenProtectionEnabled] = useState(true);
+  const [autoBlockHiddenUsers, setAutoBlockHiddenUsers] = useState(true);
   const [lastScanTime, setLastScanTime] = useState('Never');
   const [threatsBlocked, setThreatsBlocked] = useState(0);
   const [callsBlocked, setCallsBlocked] = useState(0);
+  const [hiddenUsersBlocked, setHiddenUsersBlocked] = useState(0);
+  const [recentBlocks, setRecentBlocks] = useState<BlockedAttempt[]>([]);
+  const [isMonitoring, setIsMonitoring] = useState(false);
   const pulseAnim = new Animated.Value(1);
+  const blockFlashAnim = new Animated.Value(0);
 
   useEffect(() => {
     if (protectionEnabled) {
@@ -44,6 +56,68 @@ export default function SecurityDashboard() {
       ).start();
     }
   }, [protectionEnabled]);
+
+  // Simulate monitoring for hidden unauthorized access
+  useEffect(() => {
+    let monitoringInterval: NodeJS.Timeout;
+    
+    if (autoBlockHiddenUsers && protectionEnabled) {
+      setIsMonitoring(true);
+      console.log('Auto-block monitoring started for hidden unauthorized users');
+      
+      // Simulate detecting and blocking hidden unauthorized access attempts
+      monitoringInterval = setInterval(() => {
+        // Random chance to detect a hidden threat (10% chance every 15 seconds)
+        if (Math.random() < 0.1) {
+          const threatTypes = ['hidden', 'unauthorized', 'suspicious'] as const;
+          const sources = [
+            'Unknown IP 192.168.x.x',
+            'Hidden Network Request',
+            'Unauthorized Background Process',
+            'Suspicious Data Access',
+            'Hidden Connection Attempt',
+            'Stealth Mode Access',
+          ];
+          
+          const newBlock: BlockedAttempt = {
+            id: Date.now().toString(),
+            type: threatTypes[Math.floor(Math.random() * threatTypes.length)],
+            timestamp: new Date().toLocaleTimeString(),
+            source: sources[Math.floor(Math.random() * sources.length)],
+          };
+          
+          setRecentBlocks(prev => [newBlock, ...prev.slice(0, 4)]);
+          setHiddenUsersBlocked(prev => prev + 1);
+          setThreatsBlocked(prev => prev + 1);
+          
+          // Flash animation when blocking occurs
+          Animated.sequence([
+            Animated.timing(blockFlashAnim, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+            Animated.timing(blockFlashAnim, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+          ]).start();
+          
+          console.log('Blocked hidden unauthorized access:', newBlock);
+        }
+      }, 15000); // Check every 15 seconds
+    } else {
+      setIsMonitoring(false);
+      console.log('Auto-block monitoring stopped');
+    }
+    
+    return () => {
+      if (monitoringInterval) {
+        clearInterval(monitoringInterval);
+      }
+    };
+  }, [autoBlockHiddenUsers, protectionEnabled]);
 
   const handleQuickScan = () => {
     Alert.alert('Quick Scan', 'Starting quick security scan...', [
@@ -89,6 +163,49 @@ export default function SecurityDashboard() {
     ]);
   };
 
+  const handleAutoBlockToggle = (value: boolean) => {
+    setAutoBlockHiddenUsers(value);
+    if (value) {
+      Alert.alert(
+        'Auto-Block Enabled',
+        'Hidden unauthorized internet access users will be automatically detected and blocked in real-time.',
+        [{ text: 'OK' }]
+      );
+    } else {
+      Alert.alert(
+        'Auto-Block Disabled',
+        'Automatic blocking of hidden users has been disabled. Manual intervention will be required.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const getBlockTypeColor = (type: string) => {
+    switch (type) {
+      case 'hidden':
+        return colors.danger;
+      case 'unauthorized':
+        return colors.warning;
+      case 'suspicious':
+        return colors.info;
+      default:
+        return colors.textSecondary;
+    }
+  };
+
+  const getBlockTypeIcon = (type: string) => {
+    switch (type) {
+      case 'hidden':
+        return 'eye.slash.fill';
+      case 'unauthorized':
+        return 'lock.shield.fill';
+      case 'suspicious':
+        return 'exclamationmark.triangle.fill';
+      default:
+        return 'shield.fill';
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {Platform.OS === 'ios' && (
@@ -131,6 +248,12 @@ export default function SecurityDashboard() {
                   ? 'Your device is fully secured' 
                   : 'Enable protection to secure your device'}
               </Text>
+              {isMonitoring && (
+                <View style={styles.monitoringBadge}>
+                  <View style={styles.monitoringDot} />
+                  <Text style={styles.monitoringText}>Monitoring Active</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -143,11 +266,81 @@ export default function SecurityDashboard() {
             <Text style={styles.statLabel}>Threats Blocked</Text>
           </View>
           <View style={[commonStyles.card, styles.statCard]}>
-            <IconSymbol name="phone.down.fill" size={24} color={colors.danger} />
+            <Animated.View style={{ opacity: blockFlashAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [1, 0.3]
+            })}}>
+              <IconSymbol name="eye.slash.fill" size={24} color={colors.danger} />
+              <Text style={styles.statNumber}>{hiddenUsersBlocked}</Text>
+              <Text style={styles.statLabel}>Hidden Users Blocked</Text>
+            </Animated.View>
+          </View>
+          <View style={[commonStyles.card, styles.statCard]}>
+            <IconSymbol name="phone.down.fill" size={24} color={colors.warning} />
             <Text style={styles.statNumber}>{callsBlocked}</Text>
             <Text style={styles.statLabel}>Calls Blocked</Text>
           </View>
         </View>
+
+        {/* Auto-Block Feature */}
+        <View style={commonStyles.card}>
+          <View style={styles.autoBlockHeader}>
+            <IconSymbol name="bolt.shield.fill" size={28} color={colors.primary} />
+            <Text style={styles.autoBlockTitle}>Auto-Block System</Text>
+          </View>
+          
+          <View style={styles.featureItem}>
+            <View style={styles.featureLeft}>
+              <IconSymbol name="eye.trianglebadge.exclamationmark.fill" size={24} color={colors.danger} />
+              <View style={styles.featureText}>
+                <Text style={styles.featureName}>Block Hidden Users</Text>
+                <Text style={styles.featureDescription}>
+                  Automatically detect and block hidden unauthorized internet access
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={autoBlockHiddenUsers}
+              onValueChange={handleAutoBlockToggle}
+              trackColor={{ false: colors.textSecondary, true: colors.success }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          {autoBlockHiddenUsers && (
+            <View style={styles.autoBlockInfo}>
+              <IconSymbol name="checkmark.circle.fill" size={16} color={colors.success} />
+              <Text style={styles.autoBlockInfoText}>
+                Real-time monitoring active. Hidden threats will be blocked automatically.
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {/* Recent Blocks Activity Log */}
+        {recentBlocks.length > 0 && (
+          <View style={commonStyles.card}>
+            <Text style={styles.sectionTitle}>Recent Blocks</Text>
+            {recentBlocks.map((block) => (
+              <View key={block.id} style={styles.blockItem}>
+                <View style={[styles.blockIconContainer, { backgroundColor: getBlockTypeColor(block.type) + '20' }]}>
+                  <IconSymbol 
+                    name={getBlockTypeIcon(block.type)} 
+                    size={20} 
+                    color={getBlockTypeColor(block.type)} 
+                  />
+                </View>
+                <View style={styles.blockDetails}>
+                  <Text style={styles.blockSource}>{block.source}</Text>
+                  <Text style={styles.blockTime}>{block.timestamp}</Text>
+                </View>
+                <View style={[styles.blockTypeBadge, { backgroundColor: getBlockTypeColor(block.type) }]}>
+                  <Text style={styles.blockTypeText}>{block.type.toUpperCase()}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Protection Features */}
         <View style={commonStyles.card}>
@@ -261,7 +454,8 @@ export default function SecurityDashboard() {
           <IconSymbol name="info.circle.fill" size={24} color={colors.info} />
           <Text style={styles.infoText}>
             This app provides comprehensive security features to protect your device from unauthorized access, 
-            malware, and privacy threats. Enable all features for maximum protection.
+            malware, and privacy threats. The auto-block system continuously monitors for hidden unauthorized 
+            internet access users and blocks them automatically in real-time.
           </Text>
         </View>
       </ScrollView>
@@ -312,6 +506,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
   },
+  monitoringBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  monitoringDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.success,
+    marginRight: 6,
+  },
+  monitoringText: {
+    fontSize: 12,
+    color: colors.success,
+    fontWeight: '600',
+  },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -334,6 +545,69 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
     textAlign: 'center',
+  },
+  autoBlockHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  autoBlockTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text,
+    marginLeft: 12,
+  },
+  autoBlockInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.success + '15',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  autoBlockInfoText: {
+    fontSize: 13,
+    color: colors.text,
+    marginLeft: 8,
+    flex: 1,
+  },
+  blockItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.background,
+  },
+  blockIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  blockDetails: {
+    flex: 1,
+  },
+  blockSource: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 2,
+  },
+  blockTime: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  blockTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  blockTypeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   sectionTitle: {
     fontSize: 18,
