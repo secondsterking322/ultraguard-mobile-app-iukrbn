@@ -1,5 +1,6 @@
+
 {
-  "name": "Natively",
+  "name": "firewall-anti-hack-security",
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
