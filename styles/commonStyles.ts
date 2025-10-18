@@ -5,13 +5,13 @@ export const colors = {
   background: '#f0f0f0',
   text: '#333333',
   textSecondary: '#666666',
-  primary: '#007BFF',
+  primary: '#FFD700',      // Changed to yellow (Gold)
   secondary: '#6C757D',
-  accent: '#28A745',
+  accent: '#FFC107',       // Changed to yellow (Amber)
   card: '#FFFFFF',
   highlight: '#FFC107',
   danger: '#DC3545',
-  success: '#28A745',
+  success: '#FFD700',      // Changed to yellow (Gold) - used for switches
   warning: '#FFC107',
   info: '#17A2B8',
 };
